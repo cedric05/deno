@@ -14,6 +14,22 @@ export function exit(exitCode = 0): never {
   sendSync(builder, msg.Any.Exit, inner);
   return util.unreachable();
 }
+function res(baseRes: null | msg.Base): string|null {
+  assert(baseRes != null);
+  assert(msg.Any.WorkingDirectoryRes === baseRes!.innerType());
+  const res = new msg.WorkingDirectoryRes();
+  assert(baseRes!.inner(res) != null);
+  return res.msg();
+}
+
+export function getcwd(): string|null{
+  util.log("getting current working directory");
+  const builder = new flatbuffers.Builder(0);
+  msg.WorkingDirectory.startWorkingDirectory(builder);
+  const inner = msg.WorkingDirectory.endWorkingDirectory(builder);
+  return res(sendSync(builder, msg.Any.WorkingDirectory, inner));
+
+}
 
 export function codeFetch(
   moduleSpecifier: string,
