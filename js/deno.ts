@@ -1,7 +1,7 @@
 // Copyright 2018 the Deno authors. All rights reserved. MIT license.
 // Public deno module.
 /// <amd-module name="deno"/>
-export { env, exit, getcwd } from "./os";
+export { env, exit, getcwd, getcwdSync } from "./os";
 export { File, open, stdin, stdout, stderr, read, write, close } from "./files";
 export { copy, Reader, Writer } from "./io";
 export { mkdirSync, mkdir } from "./mkdir";

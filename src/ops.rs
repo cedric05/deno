@@ -100,7 +100,7 @@ pub fn dispatch(
       msg::Any::Listen => op_listen,
       msg::Any::Accept => op_accept,
       msg::Any::Dial => op_dial,
-      msg::Any::WorkingDirectory => handle_working_directory,
+      msg::Any::WorkingDirectory => op_get_current_dir,
       _ => panic!(format!(
         "Unhandled message {}",
         msg::enum_name_any(inner_type)
@@ -807,23 +807,24 @@ fn get_mode(_perm: fs::Permissions) -> u32 {
   0
 }
 
-fn handle_working_directory(
+fn op_get_current_dir(
   _state: Arc<IsolateState>,
   base: &msg::Base,
   data: &'static mut [u8],
 )  -> Box<Op>  {
   assert_eq!(data.len(), 0);
-  let _inner = base.inner_as_working_directory().unwrap();
   let cmd_id = base.cmd_id();
-  let builder = &mut FlatBufferBuilder::new();
-  let curr_path = builder.create_string(&std::env::current_dir().unwrap().into_os_string().into_string().unwrap());
-  let inner = msg::WorkingDirectoryRes::create(
-    builder, &msg::WorkingDirectoryResArgs{
-      msg: Some(curr_path),
-      ..Default::default()
-    }
-  );
-  Box::new(futures::future::result(Ok(serialize_response(
+  blocking!(base.sync(), ||{
+    let builder = &mut FlatBufferBuilder::new();
+    let curr_path = builder.create_string(
+            &std::env::current_dir().unwrap().into_os_string().into_string().unwrap());
+    let inner = msg::WorkingDirectoryRes::create(
+      builder, &msg::WorkingDirectoryResArgs{
+        msg: Some(curr_path),
+        ..Default::default()
+      }
+    );
+    Ok(serialize_response(
       cmd_id,
       builder,
       msg::BaseArgs {
@@ -831,7 +832,8 @@ fn handle_working_directory(
         inner_type: msg::Any::WorkingDirectoryRes,
         ..Default::default()
       },
-    ))))
+    ))
+  })
 }
 
 fn op_stat(

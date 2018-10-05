@@ -4,7 +4,7 @@ import * as msg from "gen/msg_generated";
 import { assert } from "./util";
 import * as util from "./util";
 import { flatbuffers } from "flatbuffers";
-import { sendSync } from "./dispatch";
+import { sendSync, sendAsync} from "./dispatch";
 
 export function exit(exitCode = 0): never {
   const builder = new flatbuffers.Builder();
@@ -14,7 +14,8 @@ export function exit(exitCode = 0): never {
   sendSync(builder, msg.Any.Exit, inner);
   return util.unreachable();
 }
-function res(baseRes: null | msg.Base): string|null {
+
+function res(baseRes:null|msg.Base){
   assert(baseRes != null);
   assert(msg.Any.WorkingDirectoryRes === baseRes!.innerType());
   const res = new msg.WorkingDirectoryRes();
@@ -22,13 +23,19 @@ function res(baseRes: null | msg.Base): string|null {
   return res.msg();
 }
 
-export function getcwd(): string|null{
-  util.log("getting current working directory");
+function req(): [flatbuffers.Builder, msg.Any, flatbuffers.Offset]{
   const builder = new flatbuffers.Builder(0);
   msg.WorkingDirectory.startWorkingDirectory(builder);
   const inner = msg.WorkingDirectory.endWorkingDirectory(builder);
-  return res(sendSync(builder, msg.Any.WorkingDirectory, inner));
+  return [builder, msg.Any.WorkingDirectory, inner];
+}
 
+export function getcwdSync(): string|null{
+  return res(sendSync(...req()));
+}
+
+export async function getcwd(): Promise<string|null>{
+  return  res(await sendAsync(...req()));
 }
 
 export function codeFetch(
