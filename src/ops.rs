@@ -72,6 +72,7 @@ pub fn dispatch(
     op_set_timeout(isolate, &base, data)
   } else {
     // Handle regular ops.
+
     let op_creator: OpCreator = match inner_type {
       msg::Any::Start => op_start,
       msg::Any::CodeFetch => op_code_fetch,
@@ -100,6 +101,7 @@ pub fn dispatch(
       msg::Any::Accept => op_accept,
       msg::Any::Dial => op_dial,
       msg::Any::Chdir => op_chdir,
+      msg::Any::WorkingDirectory => op_get_current_dir,
       _ => panic!(format!(
         "Unhandled message {}",
         msg::enum_name_any(inner_type)
@@ -234,6 +236,7 @@ fn ok_future(buf: Buf) -> Box<Op> {
 fn odd_future(err: DenoError) -> Box<Op> {
   Box::new(futures::future::err(err))
 }
+
 
 // https://github.com/denoland/isolate/blob/golang/os.go#L100-L154
 fn op_code_fetch(
@@ -740,6 +743,7 @@ fn op_remove(
   })
 }
 
+
 // Prototype https://github.com/denoland/isolate/blob/golang/os.go#L171-L184
 fn op_read_file(
   _config: Arc<IsolateState>,
@@ -815,6 +819,38 @@ fn get_mode(perm: fs::Permissions) -> u32 {
 #[cfg(not(any(unix)))]
 fn get_mode(_perm: fs::Permissions) -> u32 {
   0
+}
+
+fn op_get_current_dir(
+  _state: Arc<IsolateState>,
+  base: &msg::Base,
+  data: &'static mut [u8],
+)  -> Box<Op>  {
+  assert_eq!(data.len(), 0);
+  let cmd_id = base.cmd_id();
+  let builder = &mut FlatBufferBuilder::new();
+  let curr_path = builder.create_string(
+          &std::env::current_dir().unwrap().into_os_string().into_string().unwrap());
+  let inner = msg::WorkingDirectoryRes::create(
+    builder, &msg::WorkingDirectoryResArgs{
+      msg: Some(curr_path),
+      ..Default::default()
+    }
+  );
+  Box::new(
+    futures::future::result(
+      Ok(
+        serialize_response(
+        cmd_id,
+        builder,
+        msg::BaseArgs {
+          inner: Some(inner.as_union_value()),
+          inner_type: msg::Any::WorkingDirectoryRes,
+          ..Default::default()
+        })
+      )
+    )
+  )
 }
 
 fn op_stat(

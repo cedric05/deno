@@ -41,6 +41,8 @@ union Any {
   Dial,
   NewConn,
   Chdir,
+  WorkingDirectory,
+  WorkingDirectoryRes,
 }
 
 enum ErrorKind: byte {
@@ -89,6 +91,14 @@ enum ErrorKind: byte {
   HttpCanceled,
   HttpParse,
   HttpOther,
+}
+
+table WorkingDirectory{
+
+}
+
+table WorkingDirectoryRes{
+  msg: string;
 }
 
 table Base {
