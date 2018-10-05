@@ -99,6 +99,7 @@ pub fn dispatch(
       msg::Any::Listen => op_listen,
       msg::Any::Accept => op_accept,
       msg::Any::Dial => op_dial,
+      msg::Any::Chdir => op_chdir,
       _ => panic!(format!(
         "Unhandled message {}",
         msg::enum_name_any(inner_type)
@@ -291,6 +292,19 @@ fn op_code_cache(
     state.dir.code_cache(filename, source_code, output_code)?;
     Ok(empty_buf())
   }()))
+}
+
+fn op_chdir(
+  _state: Arc<IsolateState>,
+  base: &msg::Base,
+  data: &'static mut [u8],
+) -> Box<Op> {
+  assert_eq!(data.len(), 0);
+  assert_eq!(data.len(), 0);
+  let inner = base.inner_as_chdir().unwrap();
+  let directory = inner.directory().unwrap();
+  assert!(std::env::set_current_dir(&directory).is_ok());
+  ok_future(empty_buf())
 }
 
 fn op_set_timeout(
