@@ -814,26 +814,29 @@ fn op_get_current_dir(
 )  -> Box<Op>  {
   assert_eq!(data.len(), 0);
   let cmd_id = base.cmd_id();
-  blocking!(base.sync(), ||{
-    let builder = &mut FlatBufferBuilder::new();
-    let curr_path = builder.create_string(
-            &std::env::current_dir().unwrap().into_os_string().into_string().unwrap());
-    let inner = msg::WorkingDirectoryRes::create(
-      builder, &msg::WorkingDirectoryResArgs{
-        msg: Some(curr_path),
-        ..Default::default()
-      }
-    );
-    Ok(serialize_response(
-      cmd_id,
-      builder,
-      msg::BaseArgs {
-        inner: Some(inner.as_union_value()),
-        inner_type: msg::Any::WorkingDirectoryRes,
-        ..Default::default()
-      },
-    ))
-  })
+  let builder = &mut FlatBufferBuilder::new();
+  let curr_path = builder.create_string(
+          &std::env::current_dir().unwrap().into_os_string().into_string().unwrap());
+  let inner = msg::WorkingDirectoryRes::create(
+    builder, &msg::WorkingDirectoryResArgs{
+      msg: Some(curr_path),
+      ..Default::default()
+    }
+  );
+  Box::new(
+    futures::future::result(
+      Ok(
+        serialize_response(
+        cmd_id,
+        builder,
+        msg::BaseArgs {
+          inner: Some(inner.as_union_value()),
+          inner_type: msg::Any::WorkingDirectoryRes,
+          ..Default::default()
+        })
+      )
+    )
+  )
 }
 
 fn op_stat(

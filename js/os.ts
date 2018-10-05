@@ -4,7 +4,7 @@ import * as msg from "gen/msg_generated";
 import { assert } from "./util";
 import * as util from "./util";
 import { flatbuffers } from "flatbuffers";
-import { sendSync, sendAsync} from "./dispatch";
+import { sendSync } from "./dispatch";
 
 export function exit(exitCode = 0): never {
   const builder = new flatbuffers.Builder();
@@ -15,27 +15,22 @@ export function exit(exitCode = 0): never {
   return util.unreachable();
 }
 
-function res(baseRes:null|msg.Base){
+/**
+ * cwd() Return a string representing the current working directory. 
+ * If the current directory can be reached via multiple paths 
+ * (due to symbolic links), cwd() may return 
+ * any one of them.
+ */
+export function cwd(): string | null{
+  const builder = new flatbuffers.Builder(0);
+  msg.WorkingDirectory.startWorkingDirectory(builder);
+  const inner = msg.WorkingDirectory.endWorkingDirectory(builder);
+  const baseRes = sendSync(builder, msg.Any.WorkingDirectory, inner);
   assert(baseRes != null);
   assert(msg.Any.WorkingDirectoryRes === baseRes!.innerType());
   const res = new msg.WorkingDirectoryRes();
   assert(baseRes!.inner(res) != null);
   return res.msg();
-}
-
-function req(): [flatbuffers.Builder, msg.Any, flatbuffers.Offset]{
-  const builder = new flatbuffers.Builder(0);
-  msg.WorkingDirectory.startWorkingDirectory(builder);
-  const inner = msg.WorkingDirectory.endWorkingDirectory(builder);
-  return [builder, msg.Any.WorkingDirectory, inner];
-}
-
-export function getcwdSync(): string|null{
-  return res(sendSync(...req()));
-}
-
-export async function getcwd(): Promise<string|null>{
-  return  res(await sendAsync(...req()));
 }
 
 export function codeFetch(
