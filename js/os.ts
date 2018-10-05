@@ -15,24 +15,6 @@ export function exit(exitCode = 0): never {
   return util.unreachable();
 }
 
-/**
- * cwd() Return a string representing the current working directory. 
- * If the current directory can be reached via multiple paths 
- * (due to symbolic links), cwd() may return 
- * any one of them.
- */
-export function cwd(): string | null{
-  const builder = new flatbuffers.Builder(0);
-  msg.WorkingDirectory.startWorkingDirectory(builder);
-  const inner = msg.WorkingDirectory.endWorkingDirectory(builder);
-  const baseRes = sendSync(builder, msg.Any.WorkingDirectory, inner);
-  assert(baseRes != null);
-  assert(msg.Any.WorkingDirectoryRes === baseRes!.innerType());
-  const res = new msg.WorkingDirectoryRes();
-  assert(baseRes!.inner(res) != null);
-  return res.msg();
-}
-
 export function codeFetch(
   moduleSpecifier: string,
   containingFile: string

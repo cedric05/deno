@@ -41,8 +41,8 @@ union Any {
   Dial,
   NewConn,
   Chdir,
-  WorkingDirectory,
-  WorkingDirectoryRes,
+  GetCwd,
+  GetCwdRes,
 }
 
 enum ErrorKind: byte {
@@ -93,12 +93,12 @@ enum ErrorKind: byte {
   HttpOther,
 }
 
-table WorkingDirectory{
+table GetCwd{
 
 }
 
-table WorkingDirectoryRes{
-  msg: string;
+table GetCwdRes{
+  cwd: string;
 }
 
 table Base {

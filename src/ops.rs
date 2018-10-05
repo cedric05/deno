@@ -72,7 +72,6 @@ pub fn dispatch(
     op_set_timeout(isolate, &base, data)
   } else {
     // Handle regular ops.
-
     let op_creator: OpCreator = match inner_type {
       msg::Any::Start => op_start,
       msg::Any::CodeFetch => op_code_fetch,
@@ -101,7 +100,7 @@ pub fn dispatch(
       msg::Any::Accept => op_accept,
       msg::Any::Dial => op_dial,
       msg::Any::Chdir => op_chdir,
-      msg::Any::WorkingDirectory => op_get_current_dir,
+      msg::Any::GetCwd => op_get_current_dir,
       _ => panic!(format!(
         "Unhandled message {}",
         msg::enum_name_any(inner_type)
@@ -110,8 +109,8 @@ pub fn dispatch(
     op_creator(isolate.state.clone(), &base, data)
   };
 
-  let boxed_op = Box::new(
-    op.or_else(move |err: DenoError| -> DenoResult<Buf> {
+  let boxed_op =
+    Box::new(op.or_else(move |err: DenoError| -> DenoResult<Buf> {
       debug!("op err {}", err);
       // No matter whether we got an Err or Ok, we want a serialized message to
       // send back. So transform the DenoError into a deno_buf.
@@ -143,8 +142,7 @@ pub fn dispatch(
         )
       };
       Ok(buf)
-    }),
-  );
+    }));
 
   debug!(
     "msg_from_js {} sync {}",
@@ -237,7 +235,6 @@ fn odd_future(err: DenoError) -> Box<Op> {
   Box::new(futures::future::err(err))
 }
 
-
 // https://github.com/denoland/isolate/blob/golang/os.go#L100-L154
 fn op_code_fetch(
   state: Arc<IsolateState>,
@@ -303,11 +300,15 @@ fn op_chdir(
   data: &'static mut [u8],
 ) -> Box<Op> {
   assert_eq!(data.len(), 0);
-  assert_eq!(data.len(), 0);
   let inner = base.inner_as_chdir().unwrap();
   let directory = inner.directory().unwrap();
-  assert!(std::env::set_current_dir(&directory).is_ok());
-  ok_future(empty_buf())
+  match std::env::set_current_dir(&directory) {
+    Ok(_v) => ok_future(empty_buf()),
+    Err(_e) => odd_future(errors::new(
+      errors::ErrorKind::NotFound,
+      String::from(format!("Directory {} Not Found", directory)),
+    )),
+  }
 }
 
 fn op_set_timeout(
@@ -370,7 +371,8 @@ fn op_env(
           ..Default::default()
         },
       )
-    }).collect();
+    })
+    .collect();
   let tables = builder.create_vector(&vars);
   let inner = msg::EnvironRes::create(
     builder,
@@ -494,7 +496,7 @@ where
 //   fn blocking<F>(is_sync: bool, f: F) -> Box<Op>
 //   where F: FnOnce() -> DenoResult<Buf>
 macro_rules! blocking {
-  ($is_sync:expr,$fn:expr) => {
+  ($is_sync:expr, $fn:expr) => {
     if $is_sync {
       // If synchronous, execute the function immediately on the main thread.
       Box::new(futures::future::result($fn()))
@@ -743,7 +745,6 @@ fn op_remove(
   })
 }
 
-
 // Prototype https://github.com/denoland/isolate/blob/golang/os.go#L171-L184
 fn op_read_file(
   _config: Arc<IsolateState>,
@@ -825,32 +826,31 @@ fn op_get_current_dir(
   _state: Arc<IsolateState>,
   base: &msg::Base,
   data: &'static mut [u8],
-)  -> Box<Op>  {
+) -> Box<Op> {
   assert_eq!(data.len(), 0);
   let cmd_id = base.cmd_id();
   let builder = &mut FlatBufferBuilder::new();
-  let curr_path = builder.create_string(
-          &std::env::current_dir().unwrap().into_os_string().into_string().unwrap());
-  let inner = msg::WorkingDirectoryRes::create(
-    builder, &msg::WorkingDirectoryResArgs{
-      msg: Some(curr_path),
+  let cwd = builder.create_string(&std::env::current_dir()
+    .unwrap()
+    .into_os_string()
+    .into_string()
+    .unwrap());
+  let inner = msg::GetCwdRes::create(
+    builder,
+    &msg::GetCwdResArgs {
+      cwd: Some(cwd),
       ..Default::default()
-    }
+    },
   );
-  Box::new(
-    futures::future::result(
-      Ok(
-        serialize_response(
-        cmd_id,
-        builder,
-        msg::BaseArgs {
-          inner: Some(inner.as_union_value()),
-          inner_type: msg::Any::WorkingDirectoryRes,
-          ..Default::default()
-        })
-      )
-    )
-  )
+  Box::new(futures::future::result(Ok(serialize_response(
+    cmd_id,
+    builder,
+    msg::BaseArgs {
+      inner: Some(inner.as_union_value()),
+      inner_type: msg::Any::GetCwdRes,
+      ..Default::default()
+    },
+  ))))
 }
 
 fn op_stat(
@@ -935,7 +935,8 @@ fn op_read_dir(
             ..Default::default()
           },
         )
-      }).collect();
+      })
+      .collect();
 
     let entries = builder.create_vector(&entries);
     let inner = msg::ReadDirRes::create(
